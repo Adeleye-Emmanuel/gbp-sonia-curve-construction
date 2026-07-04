@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/test_bootstrap.py -v)",
+      "Bash(python -m pytest tests/test_curve.py -v)"
+    ]
+  }
+}
