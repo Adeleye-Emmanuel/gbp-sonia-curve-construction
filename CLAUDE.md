@@ -19,6 +19,9 @@ market-consistent par swap rates, build a scenario engine on top of it. Part 1 o
     UK holiday calendar yet. This is a known, intentional v1 limitation — do not
     "fix" this unprompted; it's a planned M10 refinement.
   - Day count: Act/365 (standard GBP convention).
+  - For later versions we can test the below assumption:
+  Known residual: ~1-2bp discrepancy vs QuantLib cross-check likely due to naive tau=1.0 vs actual Act/365 day-count fractions (leap years cause tau≈1.0027 for periods spanning 29 Feb). Confirmed candidate, not yet isolated with a direct
+  tau comparison.
 
 ## Data
 - Source: Bank of England published OIS (SONIA) yield curve archive — free, daily,
