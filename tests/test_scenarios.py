@@ -9,7 +9,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.bootstrap import bootstrap_curve
 from src.curve import Curve
-from src.scenarios import apply_historical_shock, apply_parametric_shock
+from src.scenarios import (
+    apply_butterfly_shock,
+    apply_historical_shock,
+    apply_parametric_shock,
+    apply_wing_anchored_twist,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -58,6 +63,39 @@ def test_historical_shock_applies_observed_move(curve):
 
     for T, _ in curve.pillars:
         assert shocked.zero_rate(T) == pytest.approx(curve.zero_rate(T) + 0.005, abs=1e-9)
+
+
+def test_wing_anchored_twist(curve):
+    wing_short, wing_long = 2.0, 10.0
+    shock_short, shock_long = -0.0025, 0.0025
+    shocked = apply_wing_anchored_twist(
+        curve, wing_short=wing_short, wing_long=wing_long, shock_short=shock_short, shock_long=shock_long
+    )
+
+    # flat clamp below wing_short (only pillar below 2.0 is 1.0)
+    assert shocked.zero_rate(1.0) == pytest.approx(curve.zero_rate(1.0) + shock_short, abs=1e-9)
+
+    # exact anchor values at the wings themselves
+    assert shocked.zero_rate(wing_short) == pytest.approx(curve.zero_rate(wing_short) + shock_short, abs=1e-9)
+    assert shocked.zero_rate(wing_long) == pytest.approx(curve.zero_rate(wing_long) + shock_long, abs=1e-9)
+
+    # linear ramp in between
+    for T, _ in curve.pillars:
+        if wing_short < T < wing_long:
+            expected_shock = shock_short + (shock_long - shock_short) * (T - wing_short) / (wing_long - wing_short)
+            assert shocked.zero_rate(T) == pytest.approx(curve.zero_rate(T) + expected_shock, abs=1e-9)
+
+
+def test_butterfly_shock(curve):
+    wing_short, belly, wing_long = 2.0, 5.0, 10.0
+    wing_shock, belly_shock = -0.0025, 0.0025
+    shocked = apply_butterfly_shock(
+        curve, wing_short=wing_short, belly=belly, wing_long=wing_long, wing_shock=wing_shock, belly_shock=belly_shock
+    )
+
+    assert shocked.zero_rate(belly) == pytest.approx(curve.zero_rate(belly) + belly_shock, abs=1e-9)
+    assert shocked.zero_rate(wing_short) == pytest.approx(curve.zero_rate(wing_short) + wing_shock, abs=1e-9)
+    assert shocked.zero_rate(wing_long) == pytest.approx(curve.zero_rate(wing_long) + wing_shock, abs=1e-9)
 
 
 def _print_zero_rate_comparison(title: str, curve: Curve, shocked: Curve) -> None:
