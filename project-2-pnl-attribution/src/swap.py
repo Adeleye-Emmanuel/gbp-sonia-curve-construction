@@ -1,4 +1,5 @@
 import importlib.util
+import math
 from datetime import date, timedelta
 from pathlib import Path
 import sys
@@ -15,6 +16,16 @@ _scenarios_module = importlib.util.module_from_spec(_scenarios_spec)
 sys.modules["src.curve"] = _curve_module
 _scenarios_spec.loader.exec_module(_scenarios_module)
 apply_parametric_shock = _scenarios_module.apply_parametric_shock
+
+
+def _bump_single_pillar(curve: Curve, key_tenor: float, shock_size: float) -> Curve:
+    """Bump ONE pillar's zero rate, leave every other real pillar untouched.
+    Rebuilding Curve from this produces a self-generating tent shock via
+    existing log-linear interpolation — no separate tent formula needed.
+    The T=0 anchor is excluded and re-added automatically by Curve.__init__."""
+    real_pillars = {T: curve.zero_rate(T) for T, _ in curve.pillars if T != 0.0}
+    real_pillars[key_tenor] = real_pillars[key_tenor] + shock_size
+    return Curve({T: math.exp(-z * T) for T, z in real_pillars.items()})
 
 
 class Swap:
@@ -81,3 +92,15 @@ class Swap:
         Computed by bumping the curve and re-pricing the swap."""
         shocked_curve = apply_parametric_shock(curve, level_shift = 0.0001, slope_shift = 0.0, pivot_tenor = 5.0)
         return self.present_value(curve, as_of_date) - self.present_value(shocked_curve, as_of_date)
+
+    def key_rate_durations(self, curve: Curve, as_of_date: date, shock_size: float = 0.0001) -> dict[float, float]:
+        """Returns {tenor: KRD} for every real pillar. Same base-minus-shocked
+        sign convention as dv01: positive = swap hurt by that key rate rising."""
+        pv_base = self.present_value(curve, as_of_date)
+        result = {}
+        for T, _ in curve.pillars:
+            if T == 0.0:
+                continue
+            shocked_curve = _bump_single_pillar(curve, T, shock_size)
+            result[T] = pv_base - self.present_value(shocked_curve, as_of_date)
+        return result

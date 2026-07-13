@@ -93,3 +93,15 @@ def test_total_dv01(portfolio, curve):
 
     swap_a, swap_b = portfolio.swaps
     assert dv01 == pytest.approx(swap_a.dv01(curve, TRADE_DATE) + swap_b.dv01(curve, TRADE_DATE), abs=1e-9)
+
+
+def test_key_rate_durations(portfolio, curve):
+    krd = portfolio.key_rate_durations(curve, TRADE_DATE)
+
+    assert krd[5.0] == pytest.approx(-194.45, abs=0.5)
+    assert krd[10.0] == pytest.approx(680.79, abs=0.5)
+
+    # The real test: sum of localized (per-pillar) shocks must equal the
+    # single parallel shock (dv01) — same reconciliation discipline as
+    # every other decomposition in this project.
+    assert sum(krd.values()) == pytest.approx(portfolio.total_dv01(curve, TRADE_DATE), abs=1.0)

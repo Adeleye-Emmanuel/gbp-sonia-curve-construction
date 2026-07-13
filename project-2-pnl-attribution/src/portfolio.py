@@ -1,3 +1,4 @@
+import math
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -5,6 +6,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.swap import Curve, Swap
+
+
+def bump_single_pillar(curve: Curve, key_tenor: float, shock_size: float) -> Curve:
+    """Bump ONE pillar's zero rate, leave every other real pillar untouched.
+    Rebuilding Curve from this produces a self-generating tent shock via
+    existing log-linear interpolation — no separate tent formula needed.
+    The T=0 anchor is excluded and re-added automatically by Curve.__init__."""
+    real_pillars = {T: curve.zero_rate(T) for T, _ in curve.pillars if T != 0.0}
+    real_pillars[key_tenor] = real_pillars[key_tenor] + shock_size
+    return Curve({T: math.exp(-z * T) for T, z in real_pillars.items()})
 
 
 class Portfolio:
@@ -28,6 +39,18 @@ class Portfolio:
 
     def total_dv01(self, curve: Curve, as_of_date: date) -> float:
         return sum(s.dv01(curve, as_of_date) for s in self.swaps)
+
+    def key_rate_durations(self, curve: Curve, as_of_date: date, shock_size: float = 0.0001) -> dict[float, float]:
+        """Returns {tenor: KRD} for every real pillar. Same base-minus-shocked
+        sign convention as dv01: positive = portfolio hurt by that key rate rising."""
+        pv_base = self.present_value(curve, as_of_date)
+        result = {}
+        for T, _ in curve.pillars:
+            if T == 0.0:
+                continue
+            shocked_curve = bump_single_pillar(curve, T, shock_size)
+            result[T] = pv_base - self.present_value(shocked_curve, as_of_date)
+        return result
 
 
 def _build_curve_from_boe_data() -> Curve:
