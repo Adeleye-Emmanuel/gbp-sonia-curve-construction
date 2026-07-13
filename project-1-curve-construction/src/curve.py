@@ -3,6 +3,8 @@ import math
 
 class Curve:
     def __init__(self, discount_factors: dict[float, float]):
+        if min(discount_factors) > 0.0:
+            discount_factors = {**discount_factors, 0.0: 1.0}
         self.pillars = sorted(discount_factors.items())
 
     def discount_factor(self, T: float) -> float:

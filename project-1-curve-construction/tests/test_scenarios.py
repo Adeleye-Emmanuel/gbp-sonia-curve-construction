@@ -39,14 +39,17 @@ def test_parametric_shock_pure_parallel_shift(curve):
     shocked = apply_parametric_shock(curve, level_shift=0.005, slope_shift=0.0, pivot_tenor=5.0)
 
     for T, _ in curve.pillars:
+        if T == 0.0:
+            continue
         assert shocked.zero_rate(T) == pytest.approx(curve.zero_rate(T) + 0.005, abs=1e-9)
 
 
 def test_parametric_shock_pure_twist(curve):
     shocked = apply_parametric_shock(curve, level_shift=0.0, slope_shift=0.003, pivot_tenor=5.0)
 
-    T_min = curve.pillars[0][0]
-    T_max = curve.pillars[-1][0]
+    real_pillars = [(T, D) for T, D in curve.pillars if T != 0.0]
+    T_min = real_pillars[0][0]
+    T_max = real_pillars[-1][0]
 
     assert shocked.zero_rate(5.0) == pytest.approx(curve.zero_rate(5.0), abs=1e-9)
     assert shocked.zero_rate(T_max) == pytest.approx(curve.zero_rate(T_max) + 0.003, abs=1e-9)
@@ -62,6 +65,8 @@ def test_historical_shock_applies_observed_move(curve):
     shocked = apply_historical_shock(curve, curve_date_a, curve_date_b)
 
     for T, _ in curve.pillars:
+        if T == 0.0:
+            continue
         assert shocked.zero_rate(T) == pytest.approx(curve.zero_rate(T) + 0.005, abs=1e-9)
 
 
@@ -103,6 +108,8 @@ def _print_zero_rate_comparison(title: str, curve: Curve, shocked: Curve) -> Non
     print(f"{'Tenor':>6} | {'Base z(T)':>12} | {'Shocked z(T)':>13} | {'Diff (bp)':>10}")
     print("-" * 50)
     for T, _ in curve.pillars:
+        if T == 0.0:
+            continue
         z_base = curve.zero_rate(T)
         z_shocked = shocked.zero_rate(T)
         print(f"{T:>6.1f} | {z_base:>12.6f} | {z_shocked:>13.6f} | {(z_shocked - z_base) * 10000:>10.4f}")

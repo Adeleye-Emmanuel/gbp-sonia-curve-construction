@@ -25,9 +25,12 @@ def test_forward_rate():
     assert curve.forward_rate(1.0, 2.0) == pytest.approx(0.044082, abs=1e-4)
 
 
+def test_discount_factor_below_first_pillar_is_flat_zero_rate():
+    curve = Curve(PILLARS)
+    assert curve.zero_rate(0.5) == pytest.approx(curve.zero_rate(1.0), abs=1e-6)
+
+
 def test_discount_factor_out_of_range_raises():
     curve = Curve(PILLARS)
-    with pytest.raises(ValueError):
-        curve.discount_factor(0.5)
     with pytest.raises(ValueError):
         curve.discount_factor(2.5)

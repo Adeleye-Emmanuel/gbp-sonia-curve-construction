@@ -11,11 +11,14 @@ def apply_parametric_shock(
     Twist is exactly +slope_shift at the curve's longest pillar, exactly
     -slope_shift at its shortest pillar, and exactly 0 at pivot_tenor.
     """
-    T_min = curve.pillars[0][0]
+    T_min = curve.pillars[1][0]
     T_max = curve.pillars[-1][0]
 
     shocked_dfs = {}
     for T, _ in curve.pillars:
+        # T=0 is the D(0)=1 identity, not a market rate — never shocked; Curve re-adds it automatically.
+        if T == 0.0:
+            continue
         z = curve.zero_rate(T)
         if T >= pivot_tenor:
             twist = slope_shift * (T - pivot_tenor) / (T_max - pivot_tenor)
@@ -34,6 +37,8 @@ def apply_wing_anchored_twist(
     shock_long above wing_long, and linearly ramps between the two wings."""
     shocked_dfs = {}
     for T, _ in curve.pillars:
+        if T == 0.0:
+            continue
         z = curve.zero_rate(T)
         if T < wing_short:
             shock = shock_short
@@ -54,6 +59,8 @@ def apply_butterfly_shock(
     belly tenor, and linearly ramps between each wing and the belly."""
     shocked_dfs = {}
     for T, _ in curve.pillars:
+        if T == 0.0:
+            continue
         z = curve.zero_rate(T)
         if T < wing_short:
             shock = wing_shock
@@ -74,6 +81,8 @@ def apply_historical_shock(base_curve: Curve, curve_date_a: Curve, curve_date_b:
     onto base_curve, pillar by pillar."""
     shocked_dfs = {}
     for T, _ in base_curve.pillars:
+        if T == 0.0:
+            continue
         shock = curve_date_b.zero_rate(T) - curve_date_a.zero_rate(T)
         z_shocked = base_curve.zero_rate(T) + shock
         shocked_dfs[T] = math.exp(-z_shocked * T)
